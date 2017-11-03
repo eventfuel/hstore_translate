@@ -9,6 +9,20 @@ module HstoreTranslate
         toggle_fallback(true)
       end
 
+      # these are defined for each instance
+      def translation_ready?(language)
+        l = language.to_s
+        translation_ready_attrs.each do |attr_name|
+          # allow usage of activerecord relations as well
+          if (relation = send(attr_name)).is_a?(ActiveRecord::Relation)
+            relation.each { |r| return false unless r.translation_ready?(l) }
+          else
+            return false unless attr_translation_ready?(attr_name, l)
+          end
+        end
+        true
+      end
+
       protected
 
       attr_reader :enabled_fallback
@@ -65,15 +79,18 @@ module HstoreTranslate
       #   parse_translated_attribute_accessor("title_fr")
       #   # => [:title, :fr, false]
       #
+      #   parse_translated_attribute_accessor("title_fr_CA")
+      #   # => [:title, :fr_CA, false]
+      #
       # Returns the attribute name Symbol, locale Symbol, and a Boolean
       # indicating whether or not the caller is attempting to assign a value.
       def parse_translated_attribute_accessor(method_name)
-        return unless /(?<attribute>[a-z_]+)_(?<locale>[a-z]{2})(?<assignment>=?)\z/ =~ method_name
+        return unless /(?<attribute>[a-z_]+)_(?<locale>[a-z]{2}|[a-z]{2}_[A-Z]{2}|[a-z]{2}-[A-Z]{2})(?<assignment>=?)\z/ =~ method_name
 
         translated_attr_name = attribute.to_sym
         return unless translated_attribute_names.include?(translated_attr_name)
 
-        locale    = locale.to_sym
+        locale    = locale.tr("_", "-").to_sym
         assigning = assignment.present?
 
         [translated_attr_name, locale, assigning]
@@ -91,6 +108,13 @@ module HstoreTranslate
         else
           @enabled_fallback = enabled
         end
+      end
+
+      def attr_translation_ready?(attr_name, l)
+        attribute = send("#{attr_name}_translations")
+        return false if attribute.blank?
+        return false if attribute[l.tr('_', '-')].blank?
+        true
       end
     end
   end

@@ -5,9 +5,13 @@ module HstoreTranslate
     def translates(*attrs)
       include InstanceMethods
 
-      class_attribute :translated_attribute_names, :permitted_translated_attributes
+      class_attribute :translated_attrs, :permitted_translated_attributes, :translation_ready_attrs
+      alias_attribute :translated_attribute_names, :translated_attrs
 
-      self.translated_attribute_names = attrs
+      self.translated_attrs = attrs
+      # translation_ready attributes defaults to all, can be a reduced set with translation_ready_with :attrs
+      self.translation_ready_attrs = attrs
+
       self.permitted_translated_attributes = [
         *self.ancestors
           .select {|klass| klass.respond_to?(:permitted_translated_attributes) }
@@ -38,6 +42,12 @@ module HstoreTranslate
 
     def translates?
       included_modules.include?(InstanceMethods)
+    end
+
+    def translation_ready_with(*attrs)
+      # set the translation ready attributes so they can be checked
+      class_attribute :translation_ready_attrs
+      self.translation_ready_attrs = attrs
     end
   end
 end
